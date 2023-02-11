@@ -396,7 +396,71 @@ Tempo_Total
 
 TabelaCalcFinal[is.na(TabelaCalcFinal)] <- 0
 
-write_parquet(TabelaCalcFinal, sink = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1kmc.parquet", compression = "zstd", compression_level = 19)
+
+# Códigos das Grades Estatísticas
+
+# Posição / ordem das células:
+# 1 2
+# 3 4
+
+# grade estatistica 200m
+# 
+# id_gre 	indice_gre
+# 1123525293497614 	200ME52934N97614
+# 1123525293697614 	200ME52936N97614 
+# 1123525293497612 	200ME52934N97612 
+# 1123525293697612 	200ME52936N97612 
+
+
+# grade estatistica 1km
+
+# id_gre 	indice_gre
+# 11235354689706 	1KME5468N9706 
+# 11235354699707 	1KME5469N9707 
+# 11235354689706 	1KME5468N9706 
+# 11235354699706 	1KME5469N9706 
+
+
+
+# grade estatistica 50km
+
+# id_gre 	indice_gre
+# 11245558509150 	50KME5850N9150 
+# 11245559009150 	50KME5900N9150 
+# 11245558509100 	50KME5850N9100 
+# 11245559009100 	50KME5900N9100 
+
+
+
+# gradeestatistica 100km
+
+# id_gre 	indice_gre
+# 11255554009250 	100KME5400N9250
+# 11255555009250 	100KME5500N9250 
+# 11255554009150 	100KME5400N9150
+# 11255555009150 	100KME5500N9150 
+
+write_parquet(TabelaCalcFinal, sink = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.parquet", compression = "zstd", compression_level = 19)
+
+# Quebra em arquivos menores - depois incluir no fluxo do resto do script
+TabelaCalcFinal_int <- read_parquet("C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.parquet", as_data_frame = TRUE) %>%
+  mutate(ind100 = str_c(str_sub(INDICE_GRE, 4, 6), str_sub(INDICE_GRE, 9, 11)))
+
+listaInd100 <- unique(TabelaCalcFinal_int$ind100)
+# listaInd100 <- listaInd100[1:10]
+
+for (i in listaInd100) {
+  # filtra pra cada conjunto referente à grade de 100 km
+  tabela <- TabelaCalcFinal_int %>%
+    filter(ind100 == i)
+  
+  # salva o arquivo com o codigo equivalente da grade de 100 km no nome
+  write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/Quarto_pt2022/data/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  
+}
+
+
+
 
 fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
 fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
