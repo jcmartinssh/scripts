@@ -78,8 +78,10 @@ ListaMunMap <- unique(c(Coefs_pop$CD_GEOCODM, Coefs_dom$CD_GEOCODM))
 ListaMunNMap <- setdiff(Municipios$CD_GEOCODM, ListaMunMap)
 
 # para testar o script
-# ListaMunMap <- ListaMunMap[341:352]
-# ListaMunNMap <- ListaMunNMap[2500:2505]
+# Niterói: 3303302
+# Brasília: 5300108
+ListaMunMap <- "3303302"
+ListaMunNMap <- "5300108"
 
 end_time <- Sys.time()
 Tempo_mun <- end_time - start_time
@@ -440,7 +442,7 @@ TabelaCalcFinal[is.na(TabelaCalcFinal)] <- 0
 # 11255554009150 	100KME5400N9150
 # 11255555009150 	100KME5500N9150 
 
-write_parquet(TabelaCalcFinal, sink = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.parquet", compression = "zstd", compression_level = 19)
+write_parquet(TabelaCalcFinal, sink = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km_Niteroi.parquet", compression = "zstd", compression_level = 19)
 
 # Quebra em arquivos menores - depois incluir no fluxo do resto do script
 # TabelaCalcFinal_int <- read_parquet("C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.parquet", as_data_frame = TRUE) %>%
@@ -458,14 +460,14 @@ for (i in listaInd100) {
     filter(ind100 == i)
   
   # salva o arquivo com o codigo equivalente da grade de 100 km no nome
-  write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
-  
+  # write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
 }
 
 
 
 
-fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
-fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
+fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km_Niteroi.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
+fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km_Niteroi.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
 
 
