@@ -33,6 +33,7 @@ Coefs_Mun_pop <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLSI
 Coefs_Mun_dom <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLSISTAS/Joaquim/_GPKG/EstPop.gpkg", layer = "Coefs_Mun_dom")
 
 amostra_min <- 10
+limiar_pop <- 0.5
 
 Coefs_pop <- Coefs_SubD_pop %>%
   mutate(CD_GEOCODM = str_sub(CD_GEOCODS, start = 1, end = 7)) %>%
@@ -80,6 +81,12 @@ ListaMunNMap <- setdiff(Municipios$CD_GEOCODM, ListaMunMap)
 # para testar o script
 # ListaMunMap <- ListaMunMap[341:352]
 # ListaMunNMap <- ListaMunNMap[2500:2505]
+
+# Niterói
+# ListaMunMap <- "3303302"
+
+# Brasília e Altamira
+# ListaMunNMap <- c("5300108", "1500602")
 
 end_time <- Sys.time()
 Tempo_mun <- end_time - start_time
@@ -375,6 +382,8 @@ TabelaCalcFinal <- (
        popnegra = sum(popnegra),
        popoutra = sum(popoutra)),
     by = INDICE_GRE]
+  # filtro
+  [PopEst > 0.5]
 )
 
 
@@ -454,11 +463,16 @@ listaInd100 <- unique(TabelaCalcFinal$ind100)
 
 for (i in listaInd100) {
   # filtra pra cada conjunto referente à grade de 100 km
-  tabela <- TabelaCalcFinal %>%
-    filter(ind100 == i)
+  # tabela <- TabelaCalcFinal %>%
+  #   filter(ind100 == i)
+  
+  # o mesmo usando o data.table
+  tabela <- TabelaCalcFinal[ind100 == i]
   
   # salva o arquivo com o codigo equivalente da grade de 100 km no nome
   write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  # pra testar
+  # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
   
 }
 
@@ -467,5 +481,10 @@ for (i in listaInd100) {
 
 fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
 fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
+
+# Pra testar
+# fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km_teste.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
+# fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km_teste.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
+
 
 
