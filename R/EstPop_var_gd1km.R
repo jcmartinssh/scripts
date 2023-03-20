@@ -75,18 +75,22 @@ Municipios <- st_read("C:/ACELERADOR/Bases/MUNICIPIOS.gpkg",
 # Repara erro de topologia dos municípios
 Municipios <- st_make_valid(Municipios)
 
-ListaMunMap <- unique(c(Coefs_pop$CD_GEOCODM, Coefs_dom$CD_GEOCODM))
+# Cria lista dos municípios mapeados no Áreas urbanizadas
+ListaMunMap <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
+                       query = "SELECT CD_MUN FROM Municipios_mapeados") %>%
+  filter(CD_MUN %in% Municipios$CD_GEOCODM)
+
+ListaMunMap <- ListaMunMap$CD_MUN
+
+# Cria lista dos municípios não mapeados
 ListaMunNMap <- setdiff(Municipios$CD_GEOCODM, ListaMunMap)
 
-# para testar o script
-# ListaMunMap <- ListaMunMap[341:352]
-# ListaMunNMap <- ListaMunNMap[2500:2505]
+# TESTE
+# Niterói e São gonçalo
+# ListaMunMap <- c("3303302", "3304904")
 
-# Niterói
-# ListaMunMap <- "3303302"
-
-# Brasília e Altamira
-# ListaMunNMap <- c("5300108", "1500602")
+# Cachoeiras de Macacu e Rio Bonito
+# ListaMunNMap <- c("3304300", "3300803")
 
 end_time <- Sys.time()
 Tempo_mun <- end_time - start_time
@@ -253,7 +257,7 @@ for (i in ListaMunNMap) {
   TabelaCalcNMap[[i]] = tabela_areas
 }
 
-# consolida a tabela de calculo de municipios mapeados a partir da lista de tabelas
+# consolida a tabela de calculo de municipios não mapeados a partir da lista de tabelas
 TabelaCalcNMap <- bind_rows(TabelaCalcNMap)
 
 end_time <- Sys.time()
@@ -274,8 +278,22 @@ end_time <- Sys.time()
 Tempo_procnmap <- end_time - start_time
 start_time <- Sys.time()
 
-# junta as tabelas ou...
+# junta as tabelas
 TabelaCalcVar <- rbindlist(list(TabelaCalcMap, TabelaCalcNMap), fill = TRUE)
+
+# Verifica o município predominante para cada célula da grade
+# TabelaCalcVar <- TabelaCalcVar[max(sum(Area_Inter)), MunP := "opa", by = list(INDICE_GRE, CD_GEOCODM)]
+
+# tentando registrar o geocodigo do municipio com maior area total de intersecao com a celula da grade
+TabelaCalcVar <- TabelaCalcVar %>%
+  group_by(INDICE_GRE, CD_GEOCODM) %>%
+  mutate(AMunCel = sum(Area_Inter)) %>%
+  ungroup() %>%
+  group_by(INDICE_GRE) %>%
+  arrange(desc(AMunCel), .by_group = TRUE) %>%
+  mutate(MunPr = first(CD_GEOCODM))
+
+setDT(TabelaCalcVar)
 
 #########################################################################################
 ##### SE TIVER CARREGADO A TABELA DO GEOPROCESSAMENTO JÁ CALCULADA, CONTINUAR DAQUI #####
@@ -376,11 +394,12 @@ TabelaCalcFinal <- (
                        popbranca = branca * Area_Inter / Area_TSet,
                        popnegra = negra * Area_Inter / Area_TSet,
                        popoutra = outra * Area_Inter / Area_TSet)]
-  [, .(DomEst = sum(DomEst),
-       PopEst = sum(PopEst),
-       popbranca = sum(popbranca),
-       popnegra = sum(popnegra),
-       popoutra = sum(popoutra)),
+  [, .(DomEst = round(sum(DomEst), 1),
+       PopEst = round(sum(PopEst), 1),
+       popbranca = round(sum(popbranca), 1),
+       popnegra = round(sum(popnegra), 1),
+       popoutra = round(sum(popoutra), 1),
+       MunPr = first(MunPr)),
     by = INDICE_GRE]
   # filtro
   [PopEst > 0.5]
@@ -455,27 +474,34 @@ write_parquet(TabelaCalcFinal, sink = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.
 # TabelaCalcFinal_int <- read_parquet("C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.parquet", as_data_frame = TRUE) %>%
 #   mutate(ind100 = str_c(str_sub(INDICE_GRE, 4, 6), str_sub(INDICE_GRE, 9, 11)))
 
-TabelaCalcFinal <- TabelaCalcFinal %>%
-  mutate(ind100 = str_c(str_sub(INDICE_GRE, 4, 6), str_sub(INDICE_GRE, 9, 11)))
-
-listaInd100 <- unique(TabelaCalcFinal$ind100)
+# TabelaCalcFinal <- TabelaCalcFinal %>%
+#   mutate(ind100 = str_c(str_sub(INDICE_GRE, 4, 6), str_sub(INDICE_GRE, 9, 11)))
+# 
+# listaInd100 <- unique(TabelaCalcFinal$ind100)
 # listaInd100 <- listaInd100[1:10]
 
-for (i in listaInd100) {
+# for (i in listaInd100) {
   # filtra pra cada conjunto referente à grade de 100 km
-  # tabela <- TabelaCalcFinal %>%
-  #   filter(ind100 == i)
-  
-  # o mesmo usando o data.table
-  tabela <- TabelaCalcFinal[ind100 == i]
+  # tabela <- TabelaCalcFinal[ind100 == i]
   
   # salva o arquivo com o codigo equivalente da grade de 100 km no nome
-  write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  # write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  
   # pra testar
   # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
-  
-}
+# }
 
+# Cria lista de municípios da tabela final
+ListaMun <- unique(TabelaCalcFinal$MunPr)
+
+# Quebra em arquivos menores - por município
+for (i in ListaMun) {
+  tabela <- TabelaCalcFinal[MunPr == i]
+  write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  
+  # pra testar
+  # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+}
 
 
 
@@ -486,5 +512,8 @@ fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.csv", a
 # fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km_teste.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
 # fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km_teste.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
 
+# Verificar se algum município ficou de fora
+gc()
+MunFaltosos <- setdiff(c(ListaMunMap, ListaMunNMap), ListaMun)
 
-
+# 4300001 e 4300002 são as lagoas mirim e dos patos

@@ -6,7 +6,6 @@ library(units)
 
 ##### Pesquisar depois e adaptar para utilizar o pacote geobr ao invés dos geopackages
 
-Sys.setlocale("LC_ALL", "English")
 Sys.setenv(LANG = "English")
 
 #
@@ -55,6 +54,11 @@ Proj_IBGE_area <- 'PROJCS["Conica_Equivalente_de_Albers_Brasil",
                          PARAMETER["false_northing",10000000],
                          UNIT["Meter",1]]'
 
+# Cria lista dos municípios mapeados no Áreas urbanizadas
+ListaMunMap <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
+                       query = "SELECT CD_MUN FROM Municipios_mapeados")
+
+ListaMunMap <- ListaMunMap$CD_MUN
 
 # Carrega camada do Areas urbanizadas
 AreasUrb2015 <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
@@ -64,9 +68,11 @@ end_time <- Sys.time()
 Tempo_areasurb <- end_time - Begin_time
 start_time <- Sys.time()
 
+
 # Carrega camada dos municípios
 Municipios <- st_read("C:/ACELERADOR/Bases/MUNICIPIOS.gpkg",
-                      layer = "BRMUE250GC_SIR_2010")
+                      layer = "BRMUE250GC_SIR_2010") %>%
+  filter(CD_GEOCODM %in% ListaMunMap)
 
 # Repara erro de topologia dos municípios
 Municipios <- st_make_valid(Municipios)
