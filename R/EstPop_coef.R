@@ -55,10 +55,13 @@ Proj_IBGE_area <- 'PROJCS["Conica_Equivalente_de_Albers_Brasil",
                          UNIT["Meter",1]]'
 
 # Cria lista dos municípios mapeados no Áreas urbanizadas
-ListaMunMap <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
+ListaMun <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
                        query = "SELECT CD_MUN FROM Municipios_mapeados")
 
-ListaMunMap <- ListaMunMap$CD_MUN
+ListaMun <- ListaMunMap$CD_MUN
+
+#teste São paulo
+# ListaMunMap <- '3550308'
 
 # Carrega camada do Areas urbanizadas
 AreasUrb2015 <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
@@ -72,7 +75,7 @@ start_time <- Sys.time()
 # Carrega camada dos municípios
 Municipios <- st_read("C:/ACELERADOR/Bases/MUNICIPIOS.gpkg",
                       layer = "BRMUE250GC_SIR_2010") %>%
-  filter(CD_GEOCODM %in% ListaMunMap)
+  filter(CD_GEOCODM %in% ListaMun)
 
 # Repara erro de topologia dos municípios
 Municipios <- st_make_valid(Municipios)
@@ -85,7 +88,7 @@ rm(Municipios)
 gc()
 
 # Cria a sequência de geocódigos dos municípios
-ListaMun <- Municipios_proc$CD_GEOCODM
+# ListaMun <- Municipios_proc$CD_GEOCODM
 # ListaMun <- Municipios_proc$CD_GEOCODM[Municipios_proc$NM_MUNICIP == "RIO DE JANEIRO"]
 # ListaMun <- ListaMun[1]
 # ListaMun <- c("2307700", "2304202") # município que tá dando erro
@@ -102,7 +105,7 @@ TabelaCalcCoef <- list()
 
 # loop para intersecao das bases e calculo de areas
 for (i in ListaMun) {
-  
+
   # Seleciona e o município
   Mun <- Municipios_proc %>%
     filter(CD_GEOCODM == i)
@@ -259,7 +262,8 @@ setDF(TabelaCalcCoef)
 TabelaCalcCoef[colunas[!(colunas %in% colnames(TabelaCalcCoef))]] = 0  # semantica de Base R... devo tentar entender em algum momento
 setDT(TabelaCalcCoef)
 
-# elimina segmentos que não pertencem à células da grade utilizadas na amostra - tabela final para calculo
+# separa segmentos que não pertencem à células da grade utilizadas na amostra - tabela final para calculo
+# TabelaCalcCoef_NAmostra <- TabelaCalcCoef[grd_amostra == FALSE]
 TabelaCalcCoef <- TabelaCalcCoef[grd_amostra == TRUE]
 
 ## Integrar a parte de calculo dos coeficientes
@@ -271,9 +275,9 @@ start_time <- Sys.time()
 par.ini <- c(1, 1, 1, 1)
 ubound <- c(10^9, 10^9, 10^9, 10^9) # testar pra ver se resolve os erros
 lbound <- c(10^-9, 10^-9, 10^-9, 10^-9)
-Subd <- unique(TabelaCalcCoef$CD_GEOCODS)
-Dist <- unique(TabelaCalcCoef$CD_GEOCODD)
-Mun <- unique(TabelaCalcCoef$CD_GEOCODM)
+# Subd <- unique(TabelaCalcCoef$CD_GEOCODS)
+# Dist <- unique(TabelaCalcCoef$CD_GEOCODD)
+# Mun <- unique(TabelaCalcCoef$CD_GEOCODM)
 
 SubD_coef_dpp <- list()
 Dist_coef_dpp <- list()
@@ -427,12 +431,108 @@ Tempo_mun_dom <- end_time - start_time
 start_time <- Sys.time()
 Finish_time <- Sys.time()
 
+###
+### TÔ mexendo daqui
+
+
+# SubD_pop_NAmostra <- setdiff(unique(TabelaCalcCoef_NAmostra$CD_GEOCODS), unique(Coefs_SubD_pop$CD_GEOCODS))
+# SubD_dom_NAmostra <- setdiff(unique(TabelaCalcCoef_NAmostra$CD_GEOCODS), unique(Coefs_SubD_dom$CD_GEOCODS))
+# 
+# Dist_pop_NAmostra <- setdiff(unique(TabelaCalcCoef_NAmostra$CD_GEOCODD), unique(Coefs_Dist_pop$CD_GEOCODD))
+# Dist_dom_NAmostra <- setdiff(unique(TabelaCalcCoef_NAmostra$CD_GEOCODD), unique(Coefs_Dist_dom$CD_GEOCODD))
+# 
+# Mun_pop_NAmostra <- setdiff(unique(TabelaCalcCoef_NAmostra$CD_GEOCODM), unique(Coefs_Mun_pop$CD_GEOCODM))
+# Mun_dom_NAmostra <- setdiff(unique(TabelaCalcCoef_NAmostra$CD_GEOCODM), unique(Coefs_Mun_dom$CD_GEOCODM))
+
+# setdiff(Mun_NAmostra, unique(Coefs_Mun_dom$CD_GEOCODM))
+# 
+# length(Mun_dom_NAmostra)
+# length(SubD_NAmostra)
+# 
+### Testando esse código abaixo
+
+# AA_Coefs_Mun_dom_teste <- if_else(length(Mun_dom_NAmostra) != 0,
+#                                bind_rows(list(Coefs_Mun_dom, data.frame(CD_GEOCODM = Mun_dom_NAmostra,
+#                                                                  amostra_Mun = 0,
+#                                                                  dom_coefDS_Mun = 1,
+#                                                                  dom_coefPD_Mun = 1,
+#                                                                  dom_coefVZ_Mun = 1,
+#                                                                  dom_coefNR_Mun = 1))),
+#                               Coefs_Mun_dom)
+# 
+# AA_Coefs_SubD_dom_teste <- if_else(length(SubD_dom_NAmostra) != 0,
+#                               add_row(Coefs_SubD_dom, data.frame(CD_GEOCODS = SubD_dom_NAmostra,
+#                                                                 amostra_SubD = 0,
+#                                                                 dom_coefDS_SubD = 1,
+#                                                                 dom_coefPD_SubD = 1,
+#                                                                 dom_coefVZ_SubD = 1,
+#                                                                 dom_coefNR_SubD = 1)),
+#                               Coefs_SubD_dom)
+
+# unique(Coefs_SubD_pop)
+# 
+# Coefs_SubD_pop_NAmostra <- tryCatch({}, data.frame(CD_GEOCODS = setdiff(SubD_NAmostra, unique(Coefs_SubD_pop$CD_GEOCODS)),
+#                                       amostra_SubD = 0,
+#                                       pop_coefDS_SubD = 1,
+#                                       pop_coefPD_SubD = 1,
+#                                       pop_coefVZ_SubD = 1,
+#                                       pop_coefNR_SubD = 1))
+# 
+# Coefs_SubD_dom_NAmostra <- tryCatch({}, data.frame(CD_GEOCODS = setdiff(SubD_NAmostra, unique(Coefs_SubD_dom$CD_GEOCODS)),
+#                                       amostra_SubD = 0,
+#                                       dom_coefDS_SubD = 1,
+#                                       dom_coefPD_SubD = 1,
+#                                       dom_coefVZ_SubD = 1,
+#                                       dom_coefNR_SubD = 1))
+# 
+# Coefs_Dist_pop_NAmostra <- tryCatch({}, data.frame(CD_GEOCODD = setdiff(Dist_NAmostra, unique(Coefs_Dist_pop$CD_GEOCODD)),
+#                                       amostra_Dist = 0,
+#                                       pop_coefDS_Dist = 1,
+#                                       pop_coefPD_Dist = 1,
+#                                       pop_coefVZ_Dist = 1,
+#                                       pop_coefNR_Dist = 1))
+# 
+# Coefs_Dist_dom_NAmostra <- tryCatch({}, data.frame(CD_GEOCODD = setdiff(Dist_NAmostra, unique(Coefs_Dist_dom$CD_GEOCODD)),
+#                                       amostra_Dist = 0,
+#                                       dom_coefDS_Dist = 1,
+#                                       dom_coefPD_Dist = 1,
+#                                       dom_coefVZ_Dist = 1,
+#                                       dom_coefNR_Dist = 1))
+# 
+# Coefs_Mun_pop_NAmostra <- tryCatch({}, data.frame(CD_GEOCODM = setdiff(Mun_NAmostra, unique(Coefs_Mun_pop$CD_GEOCODM)),
+#                                      amostra_Mun = 0,
+#                                      pop_coefDS_Mun = 1,
+#                                      pop_coefPD_Mun = 1,
+#                                      pop_coefVZ_Mun = 1,
+#                                      pop_coefNR_Mun = 1), silent = TRUE)
+# 
+# Coefs_Mun_dom_NAmostra <- tryCatch({}, data.frame(CD_GEOCODM = setdiff(Mun_NAmostra, unique(Coefs_Mun_dom$CD_GEOCODM)),
+#                                          amostra_Mun = 0,
+#                                          dom_coefDS_Mun = 1,
+#                                          dom_coefPD_Mun = 1,
+#                                          dom_coefVZ_Mun = 1,
+#                                          dom_coefNR_Mun = 1), silent = TRUE)
+# 
+# Coefs_SubD_pop <- bind_rows(list(Coefs_SubD_pop, Coefs_SubD_pop_NAmostra))
+# 
+# Coefs_SubD_dom <- bind_rows(list(Coefs_SubD_dom, Coefs_SubD_dom_NAmostra))
+# 
+# Coefs_Dist_pop <- bind_rows(list(Coefs_Dist_pop, Coefs_Dist_pop_NAmostra))
+# 
+# Coefs_Dist_dom <- bind_rows(list(Coefs_Dist_dom, Coefs_Dist_dom_NAmostra)))
+# 
+# Coefs_Mun_pop <- bind_rows(list(Coefs_Mun_pop, Coefs_Mun_pop_NAmostra)))
+# 
+# Coefs_Mun_dom <- bind_rows(list(Coefs_Mun_dom, Coefs_Mun_dom_NAmostra))
+
+### Até aqui
+
 Tempo_coefs <- Finish_time - start_time
 Tempo_Total <- Finish_time - Begin_time
 
-rm(list = setdiff(ls(), c("Coefs_SubD_pop", "Coefs_SubD_dom", "Coefs_Dist_pop", "Coefs_Dist_dom", "Coefs_Mun_pop", "Coefs_Mun_dom",
-                          "TabelaCalcCoef", "Tempo_areasurb", "Tempo_municipios", "Tempo_geoproc", "Tempo_tabela", "Tempo_vars", "Tempo_subdist_pop",
-                          "Tempo_subdist_dom", "Tempo_dist_pop", "Tempo_dist_dom", "Tempo_mun_pop", "Tempo_mun_dom", "Tempo_coefs", "Tempo_Total")))
+# rm(list = setdiff(ls(), c("Coefs_SubD_pop", "Coefs_SubD_dom", "Coefs_Dist_pop", "Coefs_Dist_dom", "Coefs_Mun_pop", "Coefs_Mun_dom",
+#                           "TabelaCalcCoef", "TabelaCalcCoef_NAmostra", "Tempo_areasurb", "Tempo_municipios", "Tempo_geoproc", "Tempo_tabela", "Tempo_vars", "Tempo_subdist_pop",
+#                           "Tempo_subdist_dom", "Tempo_dist_pop", "Tempo_dist_dom", "Tempo_mun_pop", "Tempo_mun_dom", "Tempo_coefs", "Tempo_Total")))
 
 Tempo_areasurb
 Tempo_municipios

@@ -7,6 +7,15 @@ library(arrow)
 # Sys.setlocale("LC_ALL", "English")
 Sys.setenv(LANG = "English")
 
+# Variávies para construção do InOV:
+
+# População total: Básico - V002
+# População com idade vulnerável* - até 5 anos / igual ou acima de 60 anos: Pessoa13 - V022 + V035:V039 + V094:V134 -- Não se limita aos domicílios particulares permanentes, ao contrário das demais variáveis
+# População com renda inferior a 1/2 salário mínimo: PessoaRenda - V067
+# População em domicílios sem esgotamento sanitário adequado - rede ou fossa séptica: Domicilio02 - V019:V022 -- Não inclue domicílios sem sanitário de uso exclusivo dos moradores
+
+
+
 
 Begin_time <- Sys.time()
 
@@ -31,6 +40,12 @@ Coefs_Dist_pop <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLS
 Coefs_Dist_dom <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLSISTAS/Joaquim/_GPKG/EstPop.gpkg", layer = "Coefs_Dist_dom")
 Coefs_Mun_pop <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLSISTAS/Joaquim/_GPKG/EstPop.gpkg", layer = "Coefs_Mun_pop")
 Coefs_Mun_dom <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLSISTAS/Joaquim/_GPKG/EstPop.gpkg", layer = "Coefs_Mun_dom")
+
+# SP_SubD <- Coefs_SubD_dom |>
+#   filter(str_sub(CD_GEOCODS, start = 1, end = 8) %like% '3550308')
+# 
+# SP_Dist <- Coefs_Dist_dom |>
+#   filter(str_sub(CD_GEOCODD, start = 1, end = 8) %like% '3550308')
 
 amostra_min <- 10
 limiar_pop <- 0.5
@@ -58,6 +73,8 @@ setDT(Coefs_pop)
 setkey(Coefs_pop, "CD_GEOCODS")
 setDT(Coefs_dom)
 setkey(Coefs_dom, "CD_GEOCODS")
+
+SubD_Map <- Coefs_pop$CD_GEOCODS
 
 end_time <- Sys.time()
 Tempo_coefs <- end_time - Begin_time
@@ -89,6 +106,10 @@ ListaMunNMap <- setdiff(Municipios$CD_GEOCODM, ListaMunMap)
 # Niterói e São gonçalo
 # ListaMunMap <- c("3303302", "3304904")
 
+# São Paulo e Bertioga
+# ListaMunMap <- "3550308"
+# ListaMunNMap <- "3506359"
+
 # Cachoeiras de Macacu e Rio Bonito
 # ListaMunNMap <- c("3304300", "3300803")
 
@@ -105,7 +126,7 @@ Tempo_areasurb <- end_time - start_time
 start_time <- Sys.time()
 
 # Cria a lista vazia para receber os data.frames / sf interseccionados, com áreas calculadas
-TabelaCalcMap <- list()
+ListaCalcMap <- list()
 
 # loop para intersecao das bases e calculo de areas dos municipios mapeados
 for (i in ListaMunMap) {
@@ -167,11 +188,11 @@ for (i in ListaMunMap) {
   gc()
   
   # insere na lista de tabelas
-  TabelaCalcMap[[i]] = tabela_areas
+  ListaCalcMap[[i]] = tabela_areas
 }
 
 # consolida a tabela de calculo de municipios mapeados a partir da lista de tabelas
-TabelaCalcMap <- bind_rows(TabelaCalcMap)
+TabelaCalcMap <- bind_rows(ListaCalcMap)
 
 end_time <- Sys.time()
 Tempo_geopmap <- end_time - start_time
@@ -199,7 +220,8 @@ TabelaCalcMap <- (
   [, AreUrPdSet := max(AreUrPdSet), by = CD_GEOCODI]
   [, AreNResSet := max(AreNResSet), by = CD_GEOCODI]
   [, AreaVazSet := max(AreaVazSet), by = CD_GEOCODI]
-  [, map := TRUE]
+  [, map := fifelse(CD_GEOCODS %in% SubD_Map, TRUE, FALSE)]
+  [map == FALSE, Area_TSet := sum(Area_Inter), by = CD_GEOCODI]
 )
 
 end_time <- Sys.time()
@@ -317,6 +339,7 @@ str_c(ListaSet, collapse = ", ")
 # cria a query com os geocodigos dos setores
 query_set <- str_glue("SELECT Cod_setor, V001, V002 FROM 'Basico' WHERE Cod_setor IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
 query_raca <- str_glue("SELECT CD_GEOCODI, branca, preta, amarela, parda, indigena FROM 'TabCorRaca' WHERE CD_GEOCODI IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
+# query_inov <- str_glue()
 
 # Carrega a tabela de variáveis dos setores
 VarSetores <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
@@ -324,6 +347,9 @@ VarSetores <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
 
 VarRaca <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
                    query = query_raca)
+
+# VarInov <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg", 
+#                    query = query_inov)
 
 # Converte as variaveis populacao e domicilio para numerico e renomeia a variavel de geocodigo do setor
 setDT(VarSetores)
@@ -468,40 +494,41 @@ TabelaCalcFinal[is.na(TabelaCalcFinal)] <- 0
 # 11255554009150 	100KME5400N9150
 # 11255555009150 	100KME5500N9150 
 
+# Gravar esse pra testar
 write_parquet(TabelaCalcFinal, sink = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.parquet", compression = "zstd", compression_level = 19)
 
 # Quebra em arquivos menores - depois incluir no fluxo do resto do script
 # TabelaCalcFinal_int <- read_parquet("C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.parquet", as_data_frame = TRUE) %>%
 #   mutate(ind100 = str_c(str_sub(INDICE_GRE, 4, 6), str_sub(INDICE_GRE, 9, 11)))
 
-# TabelaCalcFinal <- TabelaCalcFinal %>%
-#   mutate(ind100 = str_c(str_sub(INDICE_GRE, 4, 6), str_sub(INDICE_GRE, 9, 11)))
-# 
-# listaInd100 <- unique(TabelaCalcFinal$ind100)
+TabelaCalcFinal <- TabelaCalcFinal %>%
+  mutate(ind100 = str_c(str_sub(INDICE_GRE, 4, 6), str_sub(INDICE_GRE, 9, 11)))
+
+listaInd100 <- unique(TabelaCalcFinal$ind100)
 # listaInd100 <- listaInd100[1:10]
 
-# for (i in listaInd100) {
-  # filtra pra cada conjunto referente à grade de 100 km
-  # tabela <- TabelaCalcFinal[ind100 == i]
+for (i in listaInd100) {
+# filtra pra cada conjunto referente à grade de 100 km
+tabela <- TabelaCalcFinal[ind100 == i]
   
   # salva o arquivo com o codigo equivalente da grade de 100 km no nome
-  # write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
   
   # pra testar
   # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
-# }
+}
 
 # Cria lista de municípios da tabela final
-ListaMun <- unique(TabelaCalcFinal$MunPr)
+# ListaMun <- unique(TabelaCalcFinal$MunPr)
 
 # Quebra em arquivos menores - por município
-for (i in ListaMun) {
-  tabela <- TabelaCalcFinal[MunPr == i]
-  write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
-  
+# for (i in ListaMun) {
+#   tabela <- TabelaCalcFinal[MunPr == i]
+#   write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  # 
   # pra testar
   # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
-}
+# }
 
 
 
@@ -513,7 +540,7 @@ fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.csv", a
 # fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km_teste.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
 
 # Verificar se algum município ficou de fora
-gc()
-MunFaltosos <- setdiff(c(ListaMunMap, ListaMunNMap), ListaMun)
+# gc()
+# MunFaltosos <- setdiff(c(ListaMunMap, ListaMunNMap), ListaMun)
 
 # 4300001 e 4300002 são as lagoas mirim e dos patos
