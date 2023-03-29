@@ -2,6 +2,7 @@ library(tidyverse)
 library(data.table)
 library(sf)
 library(units)
+library(arrow)
 
 
 ##### Pesquisar depois e adaptar para utilizar o pacote geobr ao invés dos geopackages
@@ -58,10 +59,10 @@ Proj_IBGE_area <- 'PROJCS["Conica_Equivalente_de_Albers_Brasil",
 ListaMun <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
                        query = "SELECT CD_MUN FROM Municipios_mapeados")
 
-ListaMun <- ListaMunMap$CD_MUN
+ListaMun <- ListaMun$CD_MUN
 
 #teste São paulo
-# ListaMunMap <- '3550308'
+# ListaMun <- '3550308'
 
 # Carrega camada do Areas urbanizadas
 AreasUrb2015 <- st_read("C:/ACELERADOR/Bases/AreasUrbanizadas2015.gpkg",
@@ -159,7 +160,7 @@ for (i in ListaMun) {
     mutate(Area_Inter = st_area(intersecao))
   
   # exporta para um geopackage para avaliação
-  st_write(st_transform(tabela_areas, crs = 4674), dsn = "C:/ACELERADOR/EsPop_coef.gpkg", layer = i, append = FALSE)
+  # st_write(st_transform(tabela_areas, crs = 4674), dsn = "C:/ACELERADOR/EsPop_coef.gpkg", layer = i, append = FALSE)
   
   # converte para numeros, sem unidade
   attributes(tabela_areas$Area_Inter) <- NULL
@@ -215,18 +216,29 @@ TabelaCalcCoef <- na.omit(TabelaCalcCoef, cols = c("CD_GEOCODI", "ID_UNICO"))
 ListaSet <- unique(TabelaCalcCoef$CD_GEOCODI)
 str_c(ListaSet, collapse = ", ")
 
+### MUDAR AQUI
+VarSetoresDOM <- read_parquet("C:/ACELERADOR/DadosCenso/dados/Domicilio01.parquet", col_select = c("Cod_setor", "V002"), as_data_frame = TRUE) %>%
+  filter(Cod_setor %in% ListaSet) %>%
+  rename("CD_GEOCODI" = "Cod_setor", "V001" = "V002") 
+
+VarSetoresPOP <- read_parquet("C:/ACELERADOR/DadosCenso/dados/Domicilio02.parquet", col_select = c("Cod_setor", "V002"), as_data_frame = TRUE) %>%
+  filter(Cod_setor %in% ListaSet) %>%
+  rename("CD_GEOCODI" = "Cod_setor")
+
+VarSetores <- VarSetoresDOM[VarSetoresPOP, on = "CD_GEOCODI"]
+
 # cria a query com os geocodigos dos setores
-query_set <- str_glue("SELECT Cod_setor, V001, V002 FROM 'Basico' WHERE Cod_setor IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
+# query_set <- str_glue("SELECT Cod_setor, V001, V002 FROM 'Basico' WHERE Cod_setor IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
 
 # Carrega a tabela de variáveis dos setores
-VarSetores <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
-                      query = query_set)
+# VarSetores <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
+#                       query = query_set)
 
 # Converte as variaveis populacao e domicilio para numerico e renomeia a variavel de geocodigo do setor
 VarSetores <- as.data.table(VarSetores)
-VarSetores <- VarSetores[, ':='(V001 = as.numeric(V001),
-                                V002 = as.numeric(V002),
-                                CD_GEOCODI = Cod_setor)]
+# VarSetores <- VarSetores[, ':='(V001 = as.numeric(V001),
+#                                 V002 = as.numeric(V002),
+#                                 CD_GEOCODI = Cod_setor)]
 
 # Associa as variaveis domicilios e moradores dos setores a tabela de calculo
 TabelaCalcCoef <- VarSetores[TabelaCalcCoef, on = "CD_GEOCODI"]
@@ -275,9 +287,9 @@ start_time <- Sys.time()
 par.ini <- c(1, 1, 1, 1)
 ubound <- c(10^9, 10^9, 10^9, 10^9) # testar pra ver se resolve os erros
 lbound <- c(10^-9, 10^-9, 10^-9, 10^-9)
-# Subd <- unique(TabelaCalcCoef$CD_GEOCODS)
-# Dist <- unique(TabelaCalcCoef$CD_GEOCODD)
-# Mun <- unique(TabelaCalcCoef$CD_GEOCODM)
+Subd <- unique(TabelaCalcCoef$CD_GEOCODS)
+Dist <- unique(TabelaCalcCoef$CD_GEOCODD)
+Mun <- unique(TabelaCalcCoef$CD_GEOCODM)
 
 SubD_coef_dpp <- list()
 Dist_coef_dpp <- list()

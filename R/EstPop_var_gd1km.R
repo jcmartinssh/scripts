@@ -41,12 +41,6 @@ Coefs_Dist_dom <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLS
 Coefs_Mun_pop <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLSISTAS/Joaquim/_GPKG/EstPop.gpkg", layer = "Coefs_Mun_pop")
 Coefs_Mun_dom <- st_read("W:/DGC_ACERVO_CGEO/PROJETOS_EM_ANDAMENTO/Cemaden/BOLSISTAS/Joaquim/_GPKG/EstPop.gpkg", layer = "Coefs_Mun_dom")
 
-# SP_SubD <- Coefs_SubD_dom |>
-#   filter(str_sub(CD_GEOCODS, start = 1, end = 8) %like% '3550308')
-# 
-# SP_Dist <- Coefs_Dist_dom |>
-#   filter(str_sub(CD_GEOCODD, start = 1, end = 8) %like% '3550308')
-
 amostra_min <- 10
 limiar_pop <- 0.5
 
@@ -108,7 +102,7 @@ ListaMunNMap <- setdiff(Municipios$CD_GEOCODM, ListaMunMap)
 
 # São Paulo e Bertioga
 # ListaMunMap <- "3550308"
-# ListaMunNMap <- "3506359"
+# ListaMunNMap <- "3506359"•
 
 # Cachoeiras de Macacu e Rio Bonito
 # ListaMunNMap <- c("3304300", "3300803")
@@ -336,50 +330,106 @@ TabelaCalcFinal <- na.omit(TabelaCalcFinal, cols = c("CD_GEOCODI", "INDICE_GRE")
 ListaSet <- unique(TabelaCalcFinal$CD_GEOCODI)
 str_c(ListaSet, collapse = ", ")
 
+####
+####
+####
+#### MUDAR ESSE TRECHO DAQUI
+# para substituir a tabela Basico - muitos erros
+
+# Basico V001 = Domicílios particulares permanentes ou pessoas responsáveis por domicílios particulares permanentes
+# Domicilio_01 V002 = Domicílios particulares permanentes
+
+# Basico V002 = Moradores em domicílios particulares permanentes ou população residente em domicílios particulares permanentes
+# Domicilio_02 V002 = Moradores em domicílios particulares permanentes
+
+# Variávies para construção do InOV:
+
+# População total: Domicilio_02 - V002
+# População com idade vulnerável* - até 5 anos / igual ou acima de 60 anos: Pessoa13 - V022 + V035:V039 + V094:V134 -- Não se limita aos domicílios particulares permanentes, ao contrário das demais variáveis
+# População com renda inferior a 1/2 salário mínimo: PessoaRenda - V067
+# População em domicílios sem esgotamento sanitário adequado - rede ou fossa séptica: Domicilio02 - V019:V022 -- Não inclue domicílios sem sanitário de uso exclusivo dos moradores
+
+vEsgoto <- str_c(rep("V"), str_pad(as.character(19:22), 3, pad = "0"))
+
+VarSetoresDOM <- read_parquet("C:/ACELERADOR/DadosCenso/dados/Domicilio01.parquet", col_select = c("Cod_setor", "V002", vEsgoto), as_data_frame = TRUE) %>%
+  filter(Cod_setor %in% ListaSet) %>%
+  rename("CD_GEOCODI" = "Cod_setor", "V001" = "V002") %>%
+  mutate(setEsgoto = select(., all_of(vEsgoto)) %>% rowSums(na.rm = TRUE)) %>%
+  select(CD_GEOCODI, V001, setEsgoto)
+
+VarSetoresPOP <- read_parquet("C:/ACELERADOR/DadosCenso/dados/Domicilio02.parquet", col_select = c("Cod_setor", "V002"), as_data_frame = TRUE) %>%
+  filter(Cod_setor %in% ListaSet) %>%
+  rename("CD_GEOCODI" = "Cod_setor")
+
+VarRenda <- read_parquet("C:/ACELERADOR/DadosCenso/dados/PessoaRenda.parquet", col_select = c("Cod_setor", "V067"), as_data_frame = TRUE) %>%
+  filter(Cod_setor %in% ListaSet) %>%
+  rename("CD_GEOCODI" = "Cod_setor", "setRenda" = "V067")
+
+vIdade <- c("V022", str_c(rep("V"), str_pad(as.character(35:39), 3, pad = "0")), str_c(rep("V"), str_pad(as.character(94:134), 3, pad = "0")))
+
+VarIdade <- read_parquet("C:/ACELERADOR/DadosCenso/dados/Pessoa13.parquet", col_select = c("Cod_setor", vIdade), as_data_frame = TRUE) %>%
+  filter(Cod_setor %in% ListaSet) %>%
+  rename("CD_GEOCODI" = "Cod_setor") %>%
+  mutate(setIdade = select(., all_of(vIdade)) %>% rowSums(na.rm = TRUE)) %>%
+  select(CD_GEOCODI, setIdade)
+
 # cria a query com os geocodigos dos setores
-query_set <- str_glue("SELECT Cod_setor, V001, V002 FROM 'Basico' WHERE Cod_setor IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
-query_raca <- str_glue("SELECT CD_GEOCODI, branca, preta, amarela, parda, indigena FROM 'TabCorRaca' WHERE CD_GEOCODI IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
+# query_set <- str_glue("SELECT Cod_setor, V001, V002 FROM 'Basico' WHERE Cod_setor IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
+# query_raca <- str_glue("SELECT CD_GEOCODI, branca, preta, amarela, parda, indigena FROM 'TabCorRaca' WHERE CD_GEOCODI IN (", str_c(ListaSet, collapse = ", "), ")", collapse = "")
 # query_inov <- str_glue()
 
 # Carrega a tabela de variáveis dos setores
-VarSetores <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
-                      query = query_set)
+# VarSetores <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
+#                       query = query_set)
 
-VarRaca <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
-                   query = query_raca)
+VarSetores <- VarSetoresDOM[VarSetoresPOP, on = "CD_GEOCODI"]
+VarSetores <- VarSetores[VarRenda, on = "CD_GEOCODI"]
+VarSetores <- VarSetores[VarIdade, on = "CD_GEOCODI"] %>%
+  select(CD_GEOCODI, V001, V002, setIdade, setRenda, setEsgoto)
+
+# VarRaca <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg",
+                   # query = query_raca)
 
 # VarInov <- st_read("C:/ACELERADOR/Bases/BASE_2010.gpkg", 
 #                    query = query_inov)
 
 # Converte as variaveis populacao e domicilio para numerico e renomeia a variavel de geocodigo do setor
 setDT(VarSetores)
-VarSetores <- VarSetores[, ':='(V001 = as.numeric(V001), V002 = as.numeric(V002), CD_GEOCODI = Cod_setor)]
+# VarSetores <- VarSetores[, ':='(V001 = as.numeric(V001), V002 = as.numeric(V002), CD_GEOCODI = Cod_setor)]
 
 # Converte as variaveis de cor ou raca para numerico
-setDT(VarRaca)
-VarRaca <- VarRaca[, ':='(CD_GEOCODI = as.character(CD_GEOCODI),
-                          branca = as.numeric(branca),
-                          preta = as.numeric(preta), 
-                          amarela = as.numeric(amarela), 
-                          parda = as.numeric(parda), 
-                          indigena = as.numeric(indigena))]
+# setDT(VarRaca)
+# VarRaca <- VarRaca[, ':='(CD_GEOCODI = as.character(CD_GEOCODI),
+#                           branca = as.numeric(branca),
+#                           preta = as.numeric(preta), 
+#                           amarela = as.numeric(amarela), 
+#                           parda = as.numeric(parda), 
+#                           indigena = as.numeric(indigena))]
+
+#### ATÉ AQUI
+####
+####
+####
 
 # Associa as variaveis domicilios e moradores dos setores a tabela de calculo
 TabelaCalcFinal <- VarSetores[TabelaCalcFinal, on = "CD_GEOCODI"]
-TabelaCalcFinal <- VarRaca[TabelaCalcFinal, on = "CD_GEOCODI"]
+# TabelaCalcFinal <- VarRaca[TabelaCalcFinal, on = "CD_GEOCODI"]
 
 # assigna o valor 0 para os setores sem valor nas variáveis V001 e V002
 TabelaCalcFinal <- (
   TabelaCalcFinal
   [is.na(V001), V001 := 0]
   [is.na(V002), V002 := 0]
-  [is.na(branca), branca := 0]
-  [is.na(preta), preta := 0]
-  [is.na(amarela), amarela := 0]
-  [is.na(parda), parda := 0]
-  [is.na(indigena), indigena := 0]
-  [, ':=' (negra = preta + parda,
-           outra = amarela + indigena)]
+  [is.na(setIdade), setIdade := 0]
+  [is.na(setRenda), setRenda := 0]
+  [is.na(setEsgoto), setEsgoto := 0]
+  # [is.na(branca), branca := 0]
+  # [is.na(preta), preta := 0]
+  # [is.na(amarela), amarela := 0]
+  # [is.na(parda), parda := 0]
+  # [is.na(indigena), indigena := 0]
+  # [, ':=' (negra = preta + parda,
+  #          outra = amarela + indigena)]
 )
 
 end_time <- Sys.time()
@@ -399,37 +449,43 @@ TabelaCalcFinal <- (
                                                            ClasseUrb == "Vaz", pop_coefVZ,
                                                            ClasseUrb == "NRes", pop_coefNR)
                       / ((AreUrDsSet * pop_coefDS) + (AreUrPdSet * pop_coefPD) + (AreaVazSet * pop_coefVZ) + (AreNResSet * pop_coefNR)),
-                      popbranca = (branca * Area_Inter) * fcase(ClasseUrb == "UrDs", pop_coefDS,
+                      idade = (setIdade * Area_Inter) * fcase(ClasseUrb == "UrDs", pop_coefDS,
                                                            ClasseUrb == "UrPd", pop_coefPD,
                                                            ClasseUrb == "Vaz", pop_coefVZ,
                                                            ClasseUrb == "NRes", pop_coefNR)
                       / ((AreUrDsSet * pop_coefDS) + (AreUrPdSet * pop_coefPD) + (AreaVazSet * pop_coefVZ) + (AreNResSet * pop_coefNR)),
-                      popnegra = (negra * Area_Inter) * fcase(ClasseUrb == "UrDs", pop_coefDS,
+                      renda = (setRenda * Area_Inter) * fcase(ClasseUrb == "UrDs", pop_coefDS,
                                                            ClasseUrb == "UrPd", pop_coefPD,
                                                            ClasseUrb == "Vaz", pop_coefVZ,
                                                            ClasseUrb == "NRes", pop_coefNR)
                       / ((AreUrDsSet * pop_coefDS) + (AreUrPdSet * pop_coefPD) + (AreaVazSet * pop_coefVZ) + (AreNResSet * pop_coefNR)),
-                      popoutra = (outra * Area_Inter) * fcase(ClasseUrb == "UrDs", pop_coefDS,
+                      esgoto = (setEsgoto * Area_Inter) * fcase(ClasseUrb == "UrDs", pop_coefDS,
                                                            ClasseUrb == "UrPd", pop_coefPD,
                                                            ClasseUrb == "Vaz", pop_coefVZ,
                                                            ClasseUrb == "NRes", pop_coefNR)
                       / ((AreUrDsSet * pop_coefDS) + (AreUrPdSet * pop_coefPD) + (AreaVazSet * pop_coefVZ) + (AreNResSet * pop_coefNR)))]
   
-  [map == FALSE, ':=' (DomEst = V001 * Area_Inter / Area_TSet,
+  [map == FALSE, `:=` (DomEst = V001 * Area_Inter / Area_TSet,
                        PopEst = V002 * Area_Inter / Area_TSet,
-                       popbranca = branca * Area_Inter / Area_TSet,
-                       popnegra = negra * Area_Inter / Area_TSet,
-                       popoutra = outra * Area_Inter / Area_TSet)]
+                       idade = setIdade * Area_Inter / Area_TSet,
+                       renda = setRenda * Area_Inter / Area_TSet,
+                       esgoto = setEsgoto * Area_Inter / Area_TSet)]
   [, .(DomEst = round(sum(DomEst), 1),
        PopEst = round(sum(PopEst), 1),
-       popbranca = round(sum(popbranca), 1),
-       popnegra = round(sum(popnegra), 1),
-       popoutra = round(sum(popoutra), 1),
+       idade = round(sum(idade), 1),
+       renda = round(sum(renda), 1),
+       esgoto = round(sum(esgoto), 1),
        MunPr = first(MunPr)),
     by = INDICE_GRE]
+  # Calcula o InOV
+  [, `:=` (maxPop = max(PopEst), maxIdade = max(idade), maxRenda = max(renda), maxEsgoto = max(esgoto)), by = MunPr]
+  [, pInOV := ((2 * (PopEst / maxPop) + (idade / maxIdade) + (renda / maxRenda) + (esgoto / maxEsgoto)))]
+  [, maxInOV := max(pInOV), by = MunPr]
+  [, InOV := pInOV / maxInOV]
   # filtro
   [PopEst > 0.5]
 )
+
 
 
 end_time <- Sys.time()
@@ -513,27 +569,28 @@ tabela <- TabelaCalcFinal[ind100 == i]
   
   # salva o arquivo com o codigo equivalente da grade de 100 km no nome
   write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+  # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/", i, "teste_tab.parquet"), compression = "zstd", compression_level = 19)
   
   # pra testar
   # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/1KM/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
 }
 
 # Cria lista de municípios da tabela final
-# ListaMun <- unique(TabelaCalcFinal$MunPr)
+ListaMun <- unique(TabelaCalcFinal$MunPr)
 
 # Quebra em arquivos menores - por município
-# for (i in ListaMun) {
-#   tabela <- TabelaCalcFinal[MunPr == i]
-#   write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
+for (i in ListaMun) {
+  tabela <- TabelaCalcFinal[MunPr == i]
+  write_parquet(tabela, sink = str_c("D:/Users/joaquim.cemaden/Documents/_GIT/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
   # 
   # pra testar
   # write_parquet(tabela, sink = str_c("C:/ACELERADOR/EstPop/grade_data/data/Municipio/", i, "_tab.parquet"), compression = "zstd", compression_level = 19)
-# }
+}
 
 
 
-fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
-fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
+# fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
+# fwrite(TabelaCalcFinal, file = "C:/ACELERADOR/EstPop/TabelaCalcFinal_1km.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
 
 # Pra testar
 # fwrite(TabelaCalcVar, file = "C:/ACELERADOR/EstPop/TabelaCalcVar_1km_teste.csv", append = FALSE, quote = TRUE, sep = ";", dec = ".")
