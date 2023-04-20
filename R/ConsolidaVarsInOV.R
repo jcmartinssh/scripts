@@ -1,45 +1,117 @@
 library(data.table)
-library(stringr)
 library(arrow)
 
+
 setDTthreads(threads = 0)
-# consolidar tabelas censo
-# Variávies para construção do InOV:
 
-# População total: Domicilio_02 - V002
-# População com idade vulnerável* - até 5 anos / igual ou acima de 60 anos: Pessoa13 - V022 + V035:V039 + V094:V134 -- Não se limita aos domicílios particulares permanentes, ao contrário das demais variáveis
-# População com renda inferior a 1/2 salário mínimo: PessoaRenda - V067
-# População em domicílios sem esgotamento sanitário adequado - rede ou fossa séptica: Domicilio02 - V019:V022 -- Não inclue domicílios sem sanitário de uso exclusivo dos moradores
+listaTabs <- c(
+  "Basico",
+  "Domicilio01",
+  "Domicilio02",
+  "DomicilioRenda",
+  "Entorno01",
+  "Entorno02",
+  "Entorno03",
+  "Entorno04",
+  "Entorno05",
+  "Pessoa01",
+  "Pessoa02",
+  "Pessoa03",
+  "Pessoa04",
+  "Pessoa05",
+  "Pessoa06",
+  "Pessoa07",
+  "Pessoa08",
+  "Pessoa09",
+  "Pessoa10",
+  "Pessoa11",
+  "Pessoa12",
+  "Pessoa13",
+  "PessoaRenda",
+  "Responsavel01",
+  "Responsavel02",
+  "ResponsavelRenda"
+  )
 
-# teste <- fread("C:/ACELERADOR/DadosCenso/dados/Basico/Basico_RS.csv", nrows = 11500) #22333 total
+  for (i in listaTabs) {
+    setwd(str_flatten(c(
+      "C:/ACELERADOR/DadosCenso/dados/", i, "/"
+    ), collapse = ""))
+    getwd()
+    uf <-
+      gsub(".*[_]([^.]+)[.].*", "\\1", list.files(pattern = "*.csv"))
+    listaUF <- list()
+    for (j in 1:length(uf)) {
+      arq <- list.files(pattern = str_c(".+", uf[j], ".csv"))
+      temp <- (fread(arq, encoding = "Latin-1", dec = ",")
+                       [, Filter(function(x) any(!is.na(x)), .SD)])
+      cols <- colnames(temp)
+      vars <- cols[substr(cols, 1, 1) == "V"]
+      listaUF[[j]] <- (temp
+                       [, replace(.SD, .SD == "X", NA)]
+                       [, (vars) := lapply(.SD, as.numeric), .SDcols = vars]
+                       [, (setdiff(cols, vars)) := lapply(.SD, as.character), .SDcols = (setdiff(cols, vars))]
+                       )
+    }
+    tabela <- rbindlist(listaUF, fill = TRUE)
+    assign(i, tabela)
+    write_parquet(get(i), str_c(c("../", i, ".parquet"), collapse = ""))
+    gc()
+  }
 
-rm(list = ls())
-listaTabs <- c("Basico", "Pessoa03", "Pessoa13", "PessoaRenda", "Domicilio01", "Domicilio02")
-
-# teste
-# listaTabs <- listaTabs[5]
-# i <- listaTabs
 
 for (i in listaTabs) {
-  
-  setwd(str_flatten(c("C:/ACELERADOR/DadosCenso/dados/", i, "/"), collapse = ""))
-  getwd()
-  uf <- gsub(".*[_]([^.]+)[.].*", "\\1", list.files(pattern = "*.csv"))
-  # uf <- uf[28]
-  listaUF <- list()
-  for (j in 1:length(uf)) {
-  
-    arq <- list.files(pattern = str_c(".+", uf[j], ".csv"))
-    cols <- colnames(fread(arq, nrows = 2, fill = TRUE, encoding = "Latin-1", dec = ","))
-    vars <- cols[substr(cols, 1, 1) == "V"]
-    listaUF[[j]] <- (fread(arq, encoding = "Latin-1", dec = ",")
-    [, replace(.SD, .SD == "X", NA)]
-    [, (vars) := lapply(.SD, as.numeric), .SDcols = vars]
-    [, (setdiff(cols, vars)) := lapply(.SD, as.character), .SDcols = (setdiff(cols, vars))]
-    )
-  }
-   
-  tabela <- rbindlist(listaUF, fill = TRUE)
-  assign(i, tabela)
-  write_parquet(get(i), str_c(c("../", i, ".parquet"), collapse = ""))
+  arq <- paste0(c("C:/ACELERADOR/DadosCenso/dados/", i, ".parquet" ), collapse = "")
+  tabela <- read_parquet(arq)
+  setDT(tabela)
+  tabela_erro <- tabela[nchar(trimws(Cod_setor)) != 15]
+  tabela <- tabela[nchar(trimws(Cod_setor)) == 15]
+  erro <- paste0(c(i, "_erro"), collapse = "")
+  assign(erro, tabela_erro)
 }
+
+
+
+###################################################################
+############# TABELAS COM PROBLEMAS EM ALGUNS SETORES #############
+###################################################################
+####  TABELAS NORMAIS: 310120 setores                             #
+# Tabelas com problemas:                                          #
+#                                                                 #
+# Basico - 310107 setores                                         #
+# Entorno02 - 310120 setores / 72521 c/ prob no geocodigo         #
+# Entorno03 - 310120 setores / 72521 c/ prob no geocodigo         #
+# Entorno04 - 310120 setores / 72521 c/ prob no geocodigo         #
+# Entorno05 - 310114 setores / 72521 c/ prob no geocodigo         #
+# Pessoa04 - 310099 setores                                       #
+# Pessoa07 - 296894 setores                                       #
+# Pessoa08 - 357853 setores / 2346 c/ prob no geocodigo           #
+# Responsavel01 - 310114 setores                                  # 
+# Responsavel02 310114 setores                                    #
+#                                                                 #
+###################################################################
+###################################################################
+#                                                                 #
+# Tabelas disponíveis: Basico, Domicilio01, Domicilio02,          #
+# DomicilioRenda, Entorno01, Pessoa01, Pessoa02, Pessoa03,        #
+# Pessoa04, Pessoa05, Pessoa06, Pessoa09, Pessoa10, Pessoa11,     #
+# Pessoa12, Pessoa13, PessoaRenda, Responsavel01, Responsavel02,  #
+# ResponsavelRenda                                                #
+#                                                                 #
+###################################################################
+
+# setEntorno05 <- Entorno05$Cod_setor
+# setPessoa04 <- Pessoa04$Cod_setor
+# setPessoa07 <- Pessoa07$Cod_setor
+# setPessoa08 <- Pessoa08$Cod_setor
+# setResponsavel01 <- Responsavel01$Cod_setor
+# setResponsavel02 <- Responsavel02$Cod_setor
+# 
+# setEntorno05_ <- lapply(setEntorno05, trimws)
+# setResponsavel01_ <- lapply(setResponsavel01, trimws)
+# setResponsavel02_ <- lapply(setResponsavel02, trimws)
+# 
+# setdiff(unlist(setResponsavel01_), unlist(setResponsavel02_))
+# setdiff(unlist(setResponsavel01_), unlist(setEntorno05_))
+# setdiff(unlist(setEntorno05_), unlist(setResponsavel02_))
+
