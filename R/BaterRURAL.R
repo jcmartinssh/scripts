@@ -25,6 +25,9 @@ fcon <- function(c) {
 
 TabelaAnalise <- list()
 
+# CodUF <- "33"
+
+
 for (i in CodUF) {
   unzip(str_glue("C:/ACELERADOR/ProcCNEFE/", i, ".zip"), exdir = "C:/ACELERADOR/ProcCNEFE/temp")
   arquivo <- (str_glue("C:/ACELERADOR/ProcCNEFE/temp/", i, ".txt"))
@@ -55,8 +58,10 @@ for (i in CodUF) {
     mutate(LATITUDE = fcon(LATITUDE), LONGITUDE = fcon(LONGITUDE))
   
   # aqui as coordenadas convertidas são transformadas em geometria no SIRGAS 2000 (EPSG 4674)
-  
   pontos_enderecos <- st_as_sf(tabela_enderecos, coords = c("LONGITUDE", "LATITUDE"), crs = 4674)
+  
+  # aqui exporta os pontos para um arquivo shapefile com o codifo da uf no nome
+  # st_write(pontos_enderecos, str_glue("C:/ACELERADOR/ProcCNEFE/pontos/pontos_", i, ".shp"))
   
   # cria a query dos setores 
   query_setor <- str_glue("SELECT CD_GEOCODI, CD_GEOCODS, CD_GEOCODD, CD_GEOCODM, NM_MUNICIP, geom FROM 'SETORES CENSITÁRIOS' WHERE substr(CD_GEOCODM, 1, 2) in ('", i, "')")
@@ -120,7 +125,7 @@ baters <- st_read("C:/ACELERADOR/Bases/CEMADEN.gpkg",
 
 TabelaAnalise <- TabelaAnalise %>%
   left_join(baters, by = "GEO_BATER") %>%
-  filter(!is.na(V001))
+  filter(!is.na(V001)) %>%
   select(CD_GEOCODI, GEO_BATER, ORIGEM, ACURACIA, ptsetor, ptinter, ptsetRisco, V001, V002)
 
 
