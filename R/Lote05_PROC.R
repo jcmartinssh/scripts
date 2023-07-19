@@ -61,7 +61,7 @@ columns <- read_sf(arquivo_saida,
                    query = "SELECT * FROM dados_faces_lote5 LIMIT 50")
 
 ## cria a lista de Municípios a partir do geocódigo das faces do arquivo
-UFs <- read_sf(arquivo_saida,
+lista_mun <- read_sf(arquivo_saida,
                query = "SELECT DISTINCT SUBSTR(X1, 1, 7) FROM dados_faces_lote5")
 
 
