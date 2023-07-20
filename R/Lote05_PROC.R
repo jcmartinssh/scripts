@@ -32,7 +32,10 @@ lista_arq <- list.files(paste(pastaRaiz, "Arquivos_DI\\", sep = ""), pattern = "
 arquivo_saida <- paste(pastaRaiz, "_GPKG\\lote5_faces.gpkg", sep = "" )
 
 ## reduz a lista de arquivos de entrada para rodar o teste
-lista_arq <- ifelse(teste == TRUE, lista_arq[c(1, 2)])
+lista_arq <- ifelse(teste == TRUE, lista_arq[c(1, 2)], lista_arq)
+
+## cria lista vazia pra receber numero de linhas de cada tabela processada
+lista_total <- list()
 
 ## loop de processamento dos arquivos da DI
 for(i in lista_arq) {
@@ -51,7 +54,7 @@ for(i in lista_arq) {
   write_sf(tabela_faces, arquivo_saida, layer = "dados_faces_lote5", append = TRUE)
   
 }
-
+                  
 ## conta o número de feições na camada produzida usando SQL
 verificacao <- read_sf(arquivo_saida,
                        query = "SELECT count(*) FROM dados_faces_lote5")
@@ -61,7 +64,7 @@ columns <- read_sf(arquivo_saida,
                    query = "SELECT * FROM dados_faces_lote5 LIMIT 50")
 
 ## cria a lista de Municípios a partir do geocódigo das faces do arquivo
-UFs <- read_sf(arquivo_saida,
+lista_mun <- read_sf(arquivo_saida,
                query = "SELECT DISTINCT SUBSTR(X1, 1, 7) FROM dados_faces_lote5")
-
+ 
 
