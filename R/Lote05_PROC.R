@@ -77,11 +77,10 @@ ver_arq <- read_sf(arquivo_saida,
                        query = "SELECT origem, count(*) as total FROM dados_faces_lote5 GROUP BY origem")
 
 ## carrega os primeiros 50 elementos da camada produzida para verificação
-amostra_faces <- read_sf(arquivo_saida,
+columns <- read_sf(arquivo_saida,
                    query = "SELECT * FROM dados_faces_lote5 LIMIT 50")
 
 ## cria a lista de Municípios a partir do geocódigo das faces do arquivo
-UFs <- read_sf(arquivo_saida,
-               query = "SELECT DISTINCT SUBSTR(X1, 1, 7) FROM dados_faces_lote5")
-
+lista_mun <- read_sf(arquivo_saida,
+               query = "SELECT DISTINCT SUBSTR(X1, 1, 7) as geomun, count(*) as total_faces FROM dados_faces_lote5 GROUP BY geomun")
 
